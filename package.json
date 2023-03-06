@@ -67,7 +67,7 @@
     "@types/jest": "27.4.1",
     "@types/node": "18.11.18",
     "jest": "27.5.1",
-    "rimraf": "3.0.2",
+    "rimraf": "4.3.0",
     "sneer": "1.0.1",
     "ts-jest": "27.1.4",
     "typescript": "4.9.4"
