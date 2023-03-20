@@ -65,7 +65,7 @@
   },
   "devDependencies": {
     "@types/jest": "27.4.1",
-    "@types/node": "18.11.18",
+    "@types/node": "18.15.3",
     "jest": "27.5.1",
     "rimraf": "4.4.0",
     "sneer": "1.0.1",
