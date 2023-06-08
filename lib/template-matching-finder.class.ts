@@ -10,7 +10,7 @@ import { ScaleImage } from './scale-image.function';
 import { ImageProcessor } from './image-processor.class';
 import { Mat } from 'opencv4nodejs-prebuilt-install/lib/typings/Mat';
 
-type CustomOptionsType = { methodType?: MethodNameType; searchMultipleScales?: boolean; scaleSteps?: Array<number>; debug?: boolean; roi?: Region };
+export type CustomOptionsType = { methodType?: MethodNameType; searchMultipleScales?: boolean; scaleSteps?: Array<number>; debug?: boolean; roi?: Region };
 
 export default class TemplateMatchingFinder implements ImageFinderInterface {
   private _config: Partial<MatchRequest<Image | string, CustomOptionsType>>;
@@ -122,8 +122,8 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
     };
   }
 
-  public async findMatches<CustomOptionsType>(matchRequest: MatchRequest<Image | string, CustomOptionsType>): Promise<MatchResult[]> {
-    let matchResults: Array<MatchResult> = [];
+  public async findMatches<CustomOptionsType>(matchRequest: MatchRequest<Image | string, CustomOptionsType>): Promise<MatchResult<Region>[]> {
+    let matchResults: Array<MatchResult<Region>> = [];
     let { haystack, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest as any);
 
     if (!searchMultipleScales) {
@@ -145,7 +145,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
     return rect;
   }
 
-  private getDecreasedRectByPixelDensity(matchResults: MatchResult[], pixelDensity: { scaleX: number; scaleY: number }) {
+  private getDecreasedRectByPixelDensity(matchResults: MatchResult<Region>[], pixelDensity: { scaleX: number; scaleY: number }) {
     return matchResults.map((results) => {
       return {
         confidence: results.confidence,
@@ -161,7 +161,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
   }
 
   private async getValidatedMatches(
-    matchResults: Array<MatchResult>,
+    matchResults: Array<MatchResult<Region>>,
     pixelDensity: {
       scaleX: number;
       scaleY: number;
@@ -195,7 +195,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
     return potentialMatches;
   }
 
-  public async findMatch<CustomOptionsType>(matchRequest: MatchRequest<Image | string, CustomOptionsType>): Promise<MatchResult> {
+  public async findMatch<CustomOptionsType>(matchRequest: MatchRequest<Image | string, CustomOptionsType>): Promise<MatchResult<Region>> {
     let { haystack, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest as any);
 
     if (!searchMultipleScales) {
@@ -211,7 +211,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
   }
 
   private async searchMultipleScales(haystack: Mat, needle: Mat, confidence: number, scaleSteps: Array<number>, methodType: MethodNameType, debug: boolean, firstMach: boolean = false) {
-    const results: MatchResult[] = [];
+    const results: MatchResult<Region>[] = [];
 
     const needleData = await this.scaleNeedle(haystack, needle, confidence, scaleSteps, methodType, debug, firstMach);
     results.push(...needleData.results);
@@ -229,7 +229,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
   }
 
   private async scaleHaystack(haystack: Mat, needle: Mat, confidence: number, scaleSteps: Array<number>, methodType: MethodNameType, debug: boolean, firstMach: boolean = false) {
-    const results: MatchResult[] = [];
+    const results: MatchResult<Region>[] = [];
     let overWrittenScaledHaystackResult = { results: results, haystack: haystack };
     let overwrittenHaystack = haystack;
 
@@ -261,7 +261,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
     debug: boolean,
     firstMatch: boolean = false,
   ): Promise<MatchedResults> {
-    const results: MatchResult[] = [];
+    const results: MatchResult<Region>[] = [];
     let overWrittenScaledNeedleResult = { results: results, haystack: haystack };
 
     for (const currentScale of scaleSteps) {
