@@ -16,7 +16,7 @@ export enum MethodEnum {
   TM_SQDIFF_NORMED = 'TM_SQDIFF_NORMED',
 }
 export type MethodNameType = `${MethodEnum}`;
-export type MatchedResults = { results: Array<MatchResult>; haystack: Mat };
+export type MatchedResults = { results: Array<MatchResult<Region>>; haystack: Mat };
 
 export class MatchTemplate {
   public static async matchImages(
@@ -25,7 +25,7 @@ export class MatchTemplate {
     matchedMethod: MethodNameType,
     debug: boolean = false,
   ): Promise<{
-    data: MatchResult;
+    data: MatchResult<Region>;
     haystack: {
       minVal: number;
       maxVal: number;
@@ -66,7 +66,7 @@ export class MatchTemplate {
     let minVal = 0;
     let maxVal = 1;
     let minMax, match;
-    let matchedResults: Array<MatchResult> = [];
+    let matchedResults: Array<MatchResult<Region>> = [];
     let prevMinVal,
       prevMaxVal = 0;
     let prevMinLoc,

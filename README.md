@@ -54,7 +54,7 @@ const matchesWithScreen = await finder.findMatches({needle: 'pathToTemplate'});
 ### Nutjs v3
 
 ```nodejs
-npm i @udarrr/template-matcher@2.0.2
+npm i @udarrr/template-matcher@2.0.4
 ```
 
 ```typescript
@@ -95,5 +95,5 @@ confidence: for "TM_SQDIFF" | "TM_SQDIFF_NORMED" confidence by default 0.98 for 
 In case using the package with [nutjs](https://github.com/nut-tree/nut.js/blob/develop/lib/optionalsearchparameters.class.ts) v3 or above please use precise 2.0.2 version of the package it could be prevented in package.json lile
 
 ```json
- "@udarrr/template-matcher": "~2.0.2",
+ "@udarrr/template-matcher": "~2.0.4",
 ```

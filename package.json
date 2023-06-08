@@ -1,6 +1,6 @@
 {
   "name": "@udarrr/template-matcher",
-  "version": "2.0.2",
+  "version": "2.0.4",
   "main": "dist/index",
   "typings": "dist/index",
   "description": "Locate images on your screen using template matching in nut.js or standalone",
@@ -61,7 +61,7 @@
   },
   "dependencies": {
     "opencv4nodejs-prebuilt-install": "^4.1.148",
-    "@nut-tree/nut-js": "^3.1.1"
+    "@nut-tree/nut-js": "^3.1.2"
   },
   "devDependencies": {
     "@types/jest": "27.4.1",
