@@ -93,7 +93,7 @@ scaleSteps: [1, 0.9, 0.8, 0.7, 0.6, 0.5]
 debug: false
 searchMultipleScales: true,
 isRotation: false,
-rotation: {range: 0, overLap: Math.min(...scaleSteps), minDstLength: 2048}
+rotation: {range: 180, overLap: 0.1, minDstLength: 2048}
 confidence: 0.8
 ```
 
