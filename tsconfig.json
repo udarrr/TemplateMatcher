@@ -2,9 +2,7 @@
   "compilerOptions": {
     "target": "ES2018",
     "module": "commonjs",
-    "lib": [
-      "es6"
-    ],
+    "lib": ["es6"],
     "outDir": "./dist",
     "declaration": true,
     "declarationMap": true,
@@ -15,15 +13,20 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
 
-    "esModuleInterop": true,
+    "esModuleInterop": true
   },
   "include": [
     "lib/**/*.ts",
-    "index.ts"
-, "tests/bound-value.function.spec.ts", "tests/image-processor.class.spec.ts", "tests/image-reader.class.spec.ts", "tests/match-image.function.spec.ts", "tests/scale-image.function.spec.ts", "tests/scale-location.function.spec.ts", "tests/template-matching-finder.class.spec.ts", "lib/types.ts"  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "tests"
-  ]
+    "index.ts",
+    "NOTICE.ts",
+    "tests/bound-value.function.spec.ts",
+    "tests/image-processor.class.spec.ts",
+    "tests/image-reader.class.spec.ts",
+    "tests/match-image.function.spec.ts",
+    "tests/scale-image.function.spec.ts",
+    "tests/scale-location.function.spec.ts",
+    "tests/template-matching-finder.class.spec.ts",
+    "lib/types.ts"
+  ],
+  "exclude": ["node_modules", "dist", "tests"]
 }

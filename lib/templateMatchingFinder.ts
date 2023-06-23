@@ -2,11 +2,12 @@ import { Image, ImageFinderInterface, imageResource, MatchRequest, MatchResult, 
 import { ScaleImageHandler } from './handlers/scaleImage';
 import { ImageProcessor } from './readers/imageProcessor.class';
 import { Mat } from 'opencv4nodejs-prebuilt-install/lib/typings/Mat';
-import { CustomMatchRequest, MethodEnum, MethodNameType, CustomConfigType } from './types';
+import { CustomMatchRequest, MethodEnum, MethodNameType, CustomConfigType, SingleTargetMatch } from './types';
 import { OverWritingMatcherHandler } from './handlers/overWriting';
 import { ValidationHandler } from './handlers/validation';
 import { NonMaximumSuppressionHandler } from './handlers/nonMaximumSuppression';
 import { InvariantRotatingHandler } from './handlers/invariantRotating';
+import { imshow, Point2, Rect, waitKey } from 'opencv4nodejs-prebuilt-install';
 
 export default class TemplateMatchingFinder implements ImageFinderInterface {
   private _config: CustomConfigType;
@@ -97,6 +98,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
     const methodType = customMatchRequest.providerData?.methodType || (this._config.providerData?.methodType as MethodNameType);
     const debug = customMatchRequest.providerData?.debug || (this._config.providerData?.debug as boolean);
     const isRotation = customMatchRequest.providerData?.isRotation || this._config.providerData?.isRotation;
+    const rotationOverLap = customMatchRequest.providerData?.rotationOption?.overLap || (this._config.providerData?.rotationOption?.overLap as number);
     const rotationRange = customMatchRequest.providerData?.rotationOption?.range || this._config.providerData?.rotationOption?.range;
     const rotationMinLength = customMatchRequest.providerData?.rotationOption?.minDstLength || this._config.providerData?.rotationOption?.minDstLength;
 
@@ -126,83 +128,54 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
       searchMultipleScales: searchMultipleScales,
       roi: customMatchRequest.providerData?.roi,
       isRotation: isRotation,
+      rotationOverLap: rotationOverLap,
       rotationRange: rotationRange,
       rotationMinLength: rotationMinLength,
     };
   }
 
   public async findMatch<OptionalSearchParameters>(matchRequest: MatchRequest<Image, OptionalSearchParameters> | CustomMatchRequest): Promise<MatchResult<Region>> {
-    let { haystack, rotationRange, isRotation, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest);
+    let { haystack, rotationOverLap, rotationRange, isRotation, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest);
+    let matchResults: Array<MatchResult<Region>> = [];
 
     if (!searchMultipleScales) {
-      let result: Array<MatchResult<Region>> = [];
-
       if (isRotation) {
-        const rotatedResults = await InvariantRotatingHandler.Match(
-          haystack.data,
-          needle.data,
-          rotationMinLength as number,
-          confidence,
-          rotationRange,
-          1 - Math.min(...(scaleSteps.length ? scaleSteps : [0])),
-        );
-        result = rotatedResults.map((i) => new MatchResult<Region>(i.dMatchScore, new Region(i.ptLT.x, i.ptLT.y, i.size.width, i.size.height)));
+        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
+        matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map((i) => new MatchResult<Region>(i.match.dMatchScore, new Region(i.point.x, i.point.y, i.newSize.width, i.newSize.height)));
       } else {
         const matches = await OverWritingMatcherHandler.matchImages(haystack.data, needle.data, methodType, debug);
-        result = [matches.data];
+        matchResults = [matches.data];
       }
-      return (await ValidationHandler.getValidatedMatches(result, haystack.pixelDensity, confidence, roi))[0];
+      return (await ValidationHandler.getValidatedMatches(matchResults, haystack.pixelDensity, confidence, roi))[0];
     } else {
-      let result: Array<MatchResult<Region>> = [];
+      let matchResults: Array<MatchResult<Region>> = [];
 
       if (isRotation) {
-        const rotatedResults = await InvariantRotatingHandler.Match(
-          haystack.data,
-          needle.data,
-          rotationMinLength as number,
-          confidence,
-          rotationRange,
-          1 - Math.min(...(scaleSteps.length ? scaleSteps : [0])),
-        );
-        result = rotatedResults.map((i) => new MatchResult<Region>(i.dMatchScore, new Region(i.ptLT.x, i.ptLT.y, i.size.width, i.size.height)));
+        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
+        matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map((i) => new MatchResult<Region>(i.match.dMatchScore, new Region(i.point.x, i.point.y, i.newSize.width, i.newSize.height)));
       } else {
-        const scaledResults = await ScaleImageHandler.searchMultipleScales(haystack.data, needle.data, confidence, scaleSteps, methodType, debug, true);
-        result = scaledResults;
+        matchResults = await ScaleImageHandler.searchMultipleScales(haystack.data, needle.data, confidence, scaleSteps, methodType, debug, true);
       }
-      return (await ValidationHandler.getValidatedMatches(result.length ? [result[0]] : result, haystack.pixelDensity, confidence, roi))[0];
+      return (await ValidationHandler.getValidatedMatches(matchResults.length ? [matchResults[0]] : matchResults, haystack.pixelDensity, confidence, roi))[0];
     }
   }
 
   public async findMatches<OptionalSearchParameters>(matchRequest: MatchRequest<Image, OptionalSearchParameters> | CustomMatchRequest): Promise<MatchResult<Region>[]> {
     let matchResults: Array<MatchResult<Region>> = [];
-    let { haystack, rotationRange, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest);
+    let { haystack, rotationOverLap, rotationRange, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest);
 
     if (!searchMultipleScales) {
       if (rotationRange) {
-        const rotatedResults = await InvariantRotatingHandler.Match(
-          haystack.data,
-          needle.data,
-          rotationMinLength as number,
-          confidence,
-          rotationRange,
-          1 - Math.min(...(scaleSteps.length ? scaleSteps : [0])),
-        );
-        matchResults = rotatedResults.map((i) => new MatchResult<Region>(i.dMatchScore, new Region(i.ptLT.x, i.ptLT.y, i.size.width, i.size.height)));
+        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
+        matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map((i) => new MatchResult<Region>(i.match.dMatchScore, new Region(i.point.x, i.point.y, i.newSize.width, i.newSize.height)));
       } else {
         const overwrittenResults = await OverWritingMatcherHandler.matchImagesByWriteOverFounded(haystack.data, needle.data, confidence, methodType, debug);
         matchResults.push(...overwrittenResults.results);
       }
     } else {
       if (rotationRange) {
-        const rotatedResults = await InvariantRotatingHandler.Match(
-          haystack.data,
-          needle.data,
-          rotationMinLength as number,
-          confidence,
-          rotationRange,
-          1 - Math.min(...(scaleSteps.length ? scaleSteps : [0])),
-        );
-        matchResults = rotatedResults.map((i) => new MatchResult<Region>(i.dMatchScore, new Region(i.ptLT.x, i.ptLT.y, i.size.width, i.size.height)));
+        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
+        matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map((i) => new MatchResult<Region>(i.match.dMatchScore, new Region(i.point.x, i.point.y, i.newSize.width, i.newSize.height)));
       } else {
         const scaledResults = await ScaleImageHandler.searchMultipleScales(haystack.data, needle.data, confidence, scaleSteps, methodType, debug);
         matchResults.push(...scaledResults);
@@ -211,5 +184,53 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
     const suppressedMatchResults = NonMaximumSuppressionHandler.filterMatchResult(matchResults);
 
     return await ValidationHandler.getValidatedMatches(suppressedMatchResults, haystack.pixelDensity, confidence, roi);
+  }
+
+  private getRotatedFullRectanglePointWithoutAngle(matches: Array<SingleTargetMatch>) {
+    const points = [];
+
+    for (let match of matches) {
+      const veryTopPoint_y = Math.min(match.ptLB.y, match.ptLT.y, match.ptRB.y, match.ptRT.y);
+      const veryBottomPoint_y = Math.max(match.ptLB.y, match.ptLT.y, match.ptRB.y, match.ptRT.y);
+      const veryLeftPoint_x = Math.min(match.ptLB.x, match.ptLT.x, match.ptRB.x, match.ptRT.x);
+      const veryRightPoint_x = Math.max(match.ptLB.x, match.ptLT.x, match.ptRB.x, match.ptRT.x);
+
+      const getPointY = (axis: number) => {
+        return Object.entries(match)
+          .map((p) => {
+            if ((p[0] === 'ptLB' || p[0] === 'ptLT' || p[0] === 'ptRB' || p[0] === 'ptRT') && p[1].y === axis) {
+              return { x: p[1].x, y: p[1].y };
+            } else {
+              return undefined;
+            }
+          })
+          .filter((f) => f !== undefined)[0] as { x: number; y: number };
+      };
+
+      const getPointX = (axis: number) => {
+        return Object.entries(match)
+          .map((p) => {
+            if ((p[0] === 'ptLB' || p[0] === 'ptLT' || p[0] === 'ptRB' || p[0] === 'ptRT') && p[1].x === axis) {
+              return { x: p[1].x, y: p[1].y };
+            } else {
+              return undefined;
+            }
+          })
+          .filter((f) => f !== undefined)[0] as { x: number; y: number };
+      };
+
+      let veryTopPoint: { x: number; y: number } = getPointY(veryTopPoint_y);
+      let veryBottomPoint: { x: number; y: number } = getPointY(veryBottomPoint_y);
+      let veryLeftPoint: { x: number; y: number } = getPointX(veryLeftPoint_x);
+      let veryRightPoint: { x: number; y: number } = getPointX(veryRightPoint_x);
+
+      const accurateTopPoint = veryTopPoint.x > veryLeftPoint.x ? veryLeftPoint.x : veryTopPoint.x;
+      const offsetTopPointWidth = veryRightPoint.x - accurateTopPoint > match.size.width ? veryRightPoint.x - accurateTopPoint : match.size.width;
+      const offsetTopPointHeight = veryBottomPoint.y - veryTopPoint.y > match.size.height ? veryBottomPoint.y - veryTopPoint.y : match.size.height;
+
+      const newSize: { width: number; height: number } = { width: offsetTopPointWidth, height: offsetTopPointHeight };
+      points.push({ match: match, point: new Point2(accurateTopPoint, veryTopPoint.y), newSize: newSize });
+    }
+    return points;
   }
 }
