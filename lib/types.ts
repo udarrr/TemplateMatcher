@@ -19,7 +19,9 @@ export type MatchedResults = { results: Array<MatchResult<Region>>; haystack: Ma
 export interface OptionsSearchParameterType {
   methodType?: MethodNameType;
   scaleSteps?: Array<number>;
-  rotation?: { range?: number; overLap?: number; minDstLength?: number };
+  searchMultipleScales: boolean;
+  isRotation: boolean;
+  rotationOption?: { range?: number; overLap?: number; minDstLength?: number };
   debug?: boolean;
   roi?: Region;
 }
