@@ -39,7 +39,7 @@ const matchesWithScreen = await finder.findMatches({needle: 'pathToTemplate'});
     haystack?: string | Image,
     needle: string | Image,
     confidence?: number,
-    customOptions?: {
+    providerData?: {
                        methodType?: MethodNameType; 
                        scaleSteps?: Array<number>; 
                        searchMultipleScales: boolean,
@@ -63,7 +63,7 @@ import {OptionsSearchParameterType} from '@udarrr/template-matcher/lib/types'
 import "@udarrr/template-matcher"; //once wherever
 
 (async () => {
-  const img = await screen.find<OptionsSearchParameterType>(imageResource("path"),{ providerData: {...}}F);
+  const img = await screen.find<OptionsSearchParameterType>(imageResource("path"),{ providerData: {...}});
   const imgs = await screen.findAll<OptionsSearchParameterType>(imageResource("path"),{ providerData: {...}});
 })();
 
@@ -95,14 +95,4 @@ searchMultipleScales: true,
 isRotation: false,
 rotation: {range: 180, overLap: 0.1, minDstLength: 2048}
 confidence: 0.8
-```
-
-#### Disclaimer for nutjs v2.3.0
-
-```nodejs
-npm i @udarrr/template-matcher@2.1.3
-```
-
-```json
- "@udarrr/template-matcher": "~2.1.3",
 ```
