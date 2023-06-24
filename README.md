@@ -42,9 +42,9 @@ const matchesWithScreen = await finder.findMatches({needle: 'pathToTemplate'});
     providerData?: {
                        methodType?: MethodNameType; 
                        scaleSteps?: Array<number>; 
-                       searchMultipleScales: boolean,
+                       isSearchMultipleScales: boolean,
                        isRotation: boolean,
-                       rotation?: { range?: number; overLap?: number; minDstLength?: number };
+                       rotationOption?: { range?: number; overLap?: number; minDstLength?: number };
                        roi?: Region; 
                        debug?: boolean
                     },
@@ -76,9 +76,9 @@ import "@udarrr/template-matcher"; //once wherever
   providerData?: {
       methodType?: MethodNameType;
       scaleSteps?: Array<number>;
-      searchMultipleScales: boolean,
+      isSearchMultipleScales: boolean,
       isRotation: boolean,
-      rotation?: { range?: number; overLap?: number; minDstLength?: number };
+      rotationOption?: { range?: number; overLap?: number; minDstLength?: number };
       debug?: boolean;
       roi?: Region;
   }
@@ -91,8 +91,8 @@ import "@udarrr/template-matcher"; //once wherever
 methodType: "TM_CCOEFF_NORMED"
 scaleSteps: [1, 0.9, 0.8, 0.7, 0.6, 0.5]
 debug: false
-searchMultipleScales: true,
+isSearchMultipleScales: true,
 isRotation: false,
-rotation: {range: 180, overLap: 0.1, minDstLength: 2048}
+rotationOption: {range: 180, overLap: 0.1, minDstLength: 256}
 confidence: 0.8
 ```

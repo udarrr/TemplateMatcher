@@ -3,13 +3,11 @@
 // Copyright (c) 2022, DennisLiu1993
 // All rights reserved.
 
-let cv: any;
-
-try {
-  cv = require('opencv4nodejs-prebuilt-install');
-} catch {}
+import cv from 'opencv4nodejs-prebuilt-install';
 import { MatchParameter, SingleTargetMatch, Vector } from '../types';
 import { Mat, Size, BORDER_CONSTANT, CV_32F, CV_64F, FILLED, INTER_LINEAR, Point2, Rect, RotatedRect, Vec3 } from 'opencv4nodejs-prebuilt-install';
+import { ImageProcessor } from '../readers/imageProcessor.class';
+import { imageResource } from '@nut-tree/nut-js';
 
 export class InvariantRotatingHandler {
   private static MATCH_CANDIDATE_NUM = 5;
@@ -34,12 +32,12 @@ export class InvariantRotatingHandler {
   private static async GetRotatedROI(matSrc: Mat, size: Size, ptLT: Point2, dAngle: number) {
     const dAngle_radian = dAngle * InvariantRotatingHandler.D2R;
     const ptC = new Point2((matSrc.cols - 1) / 2.0, (matSrc.rows - 1) / 2.0);
-    const ptLT_rotate = InvariantRotatingHandler.ptRotatePt2f(ptLT, ptC, dAngle_radian);
+    const ptLT_rotate = InvariantRotatingHandler.ptRotatePt2f(ptLT, ptC, dAngle_radian).sub(new Point2(3, 3)) as Point2;
     const sizePadding: Size = { width: size.width + 6, height: size.height + 6 };
 
     const rMat = cv.getRotationMatrix2D(ptC, dAngle, 1);
-    rMat.set(0, 2, rMat.at(0, 2) - ptLT_rotate.x - 3);
-    rMat.set(1, 2, rMat.at(1, 2) - ptLT_rotate.y - 3);
+    rMat.set(0, 2, rMat.at(0, 2) - ptLT_rotate.x);
+    rMat.set(1, 2, rMat.at(1, 2) - ptLT_rotate.y);
 
     return await matSrc.warpAffineAsync(rMat, new Size(sizePadding.width, sizePadding.height));
   }
@@ -73,7 +71,6 @@ export class InvariantRotatingHandler {
     const iTopSrcH = vecMatSrcPyr[iTopLayer].rows;
     const ptCenter = new Point2((iTopSrcW - 1) / 2.0, (iTopSrcH - 1) / 2.0);
 
-    const iSize = vecAngles.length;
     let vecMatchParameter: Array<MatchParameter> = [];
     const vecLayerScore: Array<number> = [...Array(iTopLayer + 1).keys()].fill(dScore);
     const bCalMaxByBlock =
@@ -83,11 +80,11 @@ export class InvariantRotatingHandler {
       vecLayerScore[iLayer] = vecLayerScore[iLayer - 1] * 0.9;
     }
 
-    for (let i = 0; i < iSize; i++) {
+    for (let i = 0; i < vecAngles.length; i++) {
       let matR = cv.getRotationMatrix2D(ptCenter, vecAngles[i], 1);
       let sizeBest = InvariantRotatingHandler.GetBestRotationSize(
-        { width: vecMatSrcPyr[iTopLayer].sizes[1], height: vecMatSrcPyr[iTopLayer].sizes[0] },
-        { width: pTemplData.vecPyramid[iTopLayer].sizes[1], height: pTemplData.vecPyramid[iTopLayer].sizes[0] },
+        { width: vecMatSrcPyr[iTopLayer].cols, height: vecMatSrcPyr[iTopLayer].rows },
+        { width: pTemplData.vecPyramid[iTopLayer].cols, height: pTemplData.vecPyramid[iTopLayer].rows },
         vecAngles[i],
       );
 
@@ -107,9 +104,48 @@ export class InvariantRotatingHandler {
       const matResult = await InvariantRotatingHandler.MatchTemplate(matRotatedSrc, pTemplData, iTopLayer);
 
       if (bCalMaxByBlock) {
-        //do nothing
+        const blockMax = new SBlockMax(matResult, new Size(pTemplData.vecPyramid[iTopLayer].cols, pTemplData.vecPyramid[iTopLayer].rows));
+        const minMaxLoc = blockMax.GetMaxValueLoc();
+
+        let nextMaxLoc: {
+          srcMat: Mat;
+          minMaxLoc: {
+            dMaxVal: number;
+            ptMaxLoc: cv.Point2;
+          };
+        } = { srcMat: matResult, minMaxLoc: minMaxLoc };
+
+        if (minMaxLoc.dMaxVal < vecLayerScore[iTopLayer]) {
+          continue;
+        }
+        vecMatchParameter.push({
+          pt: new Point2(nextMaxLoc.minMaxLoc.ptMaxLoc.x - fTranslationX, nextMaxLoc.minMaxLoc.ptMaxLoc.y - fTranslationY),
+          size: new Size(pTemplData.vecPyramid[iTopLayer].cols, pTemplData.vecPyramid[iTopLayer].rows),
+          dMatchScore: nextMaxLoc.minMaxLoc.dMaxVal,
+          dMatchAngle: vecAngles[i],
+        });
+
+        for (let j = 0; j < m_iMaxPos + InvariantRotatingHandler.MATCH_CANDIDATE_NUM - 1; j++) {
+          nextMaxLoc = await InvariantRotatingHandler.GetNextMaxLocBlock(
+            matResult,
+            nextMaxLoc.minMaxLoc.ptMaxLoc,
+            new Size(pTemplData.vecPyramid[iTopLayer].cols, pTemplData.vecPyramid[iTopLayer].rows),
+            m_dMaxOverlap,
+            blockMax,
+          );
+          if (nextMaxLoc.minMaxLoc.dMaxVal < vecLayerScore[iTopLayer]) {
+            break;
+          }
+          vecMatchParameter.push({
+            pt: new Point2(nextMaxLoc.minMaxLoc.ptMaxLoc.x - fTranslationX, nextMaxLoc.minMaxLoc.ptMaxLoc.y - fTranslationY),
+            size: new Size(pTemplData.vecPyramid[iTopLayer].cols, pTemplData.vecPyramid[iTopLayer].rows),
+            dMatchScore: nextMaxLoc.minMaxLoc.dMaxVal,
+            dMatchAngle: vecAngles[i],
+          });
+        }
       } else {
         let minMaxLoc = await cv.minMaxLocAsync(matResult);
+
         if (minMaxLoc.maxVal < vecLayerScore[iTopLayer]) {
           continue;
         }
@@ -151,7 +187,6 @@ export class InvariantRotatingHandler {
     }
     vecMatchParameter.sort((first, second) => second.dMatchScore - first.dMatchScore);
 
-    const iMatchSize = vecMatchParameter.length;
     let iDstW = pTemplData.vecPyramid[iTopLayer].cols;
     let iDstH = pTemplData.vecPyramid[iTopLayer].rows;
 
@@ -167,8 +202,7 @@ export class InvariantRotatingHandler {
       vecMatchParameter[i].dAngleEnd = vecMatchParameter[i].dMatchAngle + dAngleStep;
 
       if (iTopLayer <= iStopLayer) {
-        const ptLTTemp = ptLT.mul(iTopLayer == 0 ? 1 : 2) as Point2;
-        vecMatchParameter[i].pt = ptLTTemp; //TODO!
+        vecMatchParameter[i].pt = ptLT.mul(iTopLayer == 0 ? 1 : 2) as Point2;
         vecAllResult.push(vecMatchParameter[i]);
       } else {
         for (let iLayer = iTopLayer - 1; iLayer >= iStopLayer; iLayer--) {
@@ -190,21 +224,18 @@ export class InvariantRotatingHandler {
             }
           }
           const ptSrcCenter: Point2 = new Point2((vecMatSrcPyr[iLayer].cols - 1) / 2.0, (vecMatSrcPyr[iLayer].rows - 1) / 2.0);
-          const iSize = vecAngles.length;
           const vecNewMatchParameter: Array<MatchParameter> = [];
           let iMaxScoreIndex = 0;
           let dBigValue = -1;
 
-          for (let j = 0; j < iSize; j++) {
-            const ptLTTemp = ptLT.mul(2) as Point2;
+          for (let j = 0; j < vecAngles.length; j++) {
             const matRotatedSrc = await InvariantRotatingHandler.GetRotatedROI(
               vecMatSrcPyr[iLayer],
-              { width: pTemplData.vecPyramid[iLayer].sizes[1], height: pTemplData.vecPyramid[iLayer].sizes[0] },
-              ptLTTemp,
+              new Size(pTemplData.vecPyramid[iLayer].cols, pTemplData.vecPyramid[iLayer].rows),
+              ptLT.mul(2) as Point2,
               vecAngles[j],
             );
             const matResult = await InvariantRotatingHandler.MatchTemplate(matRotatedSrc, pTemplData, iLayer);
-
             const minMax = matResult.minMaxLoc();
             const dMaxValue = minMax.maxVal;
             const ptMaxLoc = minMax.maxLoc;
@@ -581,7 +612,7 @@ export class InvariantRotatingHandler {
     }
   }
 
-  private static async GetNextMaxLoc(matResult: Mat, ptMaxLoc: Point2, sizeTemplate: { width: number; height: number }, dMaxOverlap: number) {
+  private static async GetNextMaxLoc(matResult: Mat, ptMaxLoc: Point2, sizeTemplate: Size, dMaxOverlap: number) {
     const iStartX = ptMaxLoc.x - sizeTemplate.width * (1 - dMaxOverlap);
     const iStartY = ptMaxLoc.y - sizeTemplate.height * (1 - dMaxOverlap);
 
@@ -590,6 +621,23 @@ export class InvariantRotatingHandler {
     const ptNewMaxLoc = await cv.minMaxLocAsync(matResult);
 
     return { srcMat: matResult, minMaxLoc: ptNewMaxLoc };
+  }
+
+  private static async GetNextMaxLocBlock(matResult: Mat, ptMaxLoc: Point2, sizeTemplate: Size, dMaxOverlap: number, blockMax: SBlockMax) {
+    let iStartX = Math.floor(ptMaxLoc.x - sizeTemplate.width * (1 - dMaxOverlap));
+    let iStartY = Math.floor(ptMaxLoc.y - sizeTemplate.height * (1 - dMaxOverlap));
+    const rectIgnore = new Rect(iStartX, iStartY, Math.floor(2 * sizeTemplate.width * (1 - dMaxOverlap)), Math.floor(2 * sizeTemplate.height * (1 - dMaxOverlap)));
+    matResult.drawRectangle(rectIgnore, new Vec3(-1, -1, -1), FILLED);
+    blockMax.UpdateMax(rectIgnore);
+    const ptReturn = blockMax.GetMaxValueLoc();
+
+    return {
+      srcMat: matResult,
+      minMaxLoc: {
+        dMaxVal: ptReturn.dMaxVal,
+        ptMaxLoc: ptReturn.ptMaxLoc,
+      },
+    };
   }
 
   private static readDoubleLE(array: Array<number>, offset: number = 0) {
@@ -650,8 +698,7 @@ export class InvariantRotatingHandler {
   private static async MatchTemplate(matSrc: Mat, pTemplData: Vector, iLayer: number, method: 'TM_CCOEFF_NORMED' | 'TM_CCORR' = 'TM_CCORR') {
     const result = await matSrc.matchTemplateAsync(pTemplData.vecPyramid[iLayer], cv[method]);
 
-    const res = await InvariantRotatingHandler.CCOEFF_Denominator(matSrc, pTemplData, result, iLayer);
-    return res;
+    return await InvariantRotatingHandler.CCOEFF_Denominator(matSrc, pTemplData, result, iLayer);
   }
 
   private static async CCOEFF_Denominator(matSrc: Mat, pTemplData: Vector, matResult: Mat, iLayer: number) {
@@ -822,5 +869,134 @@ export class InvariantRotatingHandler {
     dY = -dY + dHeight;
 
     return new Point2(dX, dY);
+  }
+}
+
+interface Block {
+  rect: Rect;
+  dMax: number;
+  ptMaxLoc: Point2;
+}
+
+class SBlockMax {
+  vecBlock: Array<Block> = [];
+
+  constructor(readonly matSrc: Mat, readonly sizeTemplate: Size) {
+    const iBlockW = sizeTemplate.width * 2;
+    const iBlockH = sizeTemplate.height * 2;
+
+    const iCol = Math.floor(matSrc.cols / iBlockW);
+    const bHResidue = matSrc.cols % iBlockW != 0;
+
+    const iRow = Math.floor(matSrc.rows / iBlockH);
+    const bVResidue = matSrc.rows % iBlockH != 0;
+
+    if (iCol === 0 || iRow === 0) {
+      this.vecBlock = [];
+      return;
+    }
+    for (let i = 0; i < iCol * iRow; i++) {
+      this.vecBlock.push({ rect: new Rect(), dMax: 0, ptMaxLoc: new Point2(0, 0) });
+    }
+
+    let iCount = 0;
+
+    for (let y = 0; y < iRow; y++) {
+      for (let x = 0; x < iCol; x++) {
+        const rectBlock = new Rect(x * iBlockW, y * iBlockH, iBlockW, iBlockH);
+        this.vecBlock[iCount].rect = rectBlock;
+        const minMax = cv.minMaxLoc(matSrc.getRegion(rectBlock));
+        this.vecBlock[iCount].dMax = minMax.maxVal;
+        this.vecBlock[iCount].ptMaxLoc = minMax.maxLoc;
+        this.vecBlock[iCount].ptMaxLoc = this.vecBlock[iCount].ptMaxLoc.add(new Point2(rectBlock.x, rectBlock.y)) as Point2;
+
+        iCount++;
+      }
+    }
+    if (bHResidue && bVResidue) {
+      const rectRight = new Rect(iCol * iBlockW, 0, matSrc.cols - iCol * iBlockW, matSrc.rows);
+      const maxMin = cv.minMaxLoc(matSrc.getRegion(rectRight));
+      let blockRight: Block = { dMax: 0, rect: new Rect(), ptMaxLoc: new Point2(0, 0) };
+      blockRight.dMax = maxMin.maxVal;
+      blockRight.rect = rectRight;
+      blockRight.ptMaxLoc = maxMin.maxLoc;
+      blockRight.ptMaxLoc = blockRight.ptMaxLoc.add(new Point2(rectRight.x, rectRight.y)) as Point2;
+      this.vecBlock.push(blockRight);
+
+      const rectBottom = new Rect(0, iRow * iBlockH, iCol * iBlockW, matSrc.rows - iRow * iBlockH);
+      const maxMin2 = cv.minMaxLoc(matSrc.getRegion(rectBottom));
+      let blockBottom: Block = { dMax: 0, rect: new Rect(), ptMaxLoc: new Point2(0, 0) };
+      blockBottom.dMax = maxMin2.maxVal;
+      blockBottom.rect = rectBottom;
+      blockBottom.ptMaxLoc = maxMin2.maxLoc;
+      blockBottom.ptMaxLoc = blockBottom.ptMaxLoc.add(new Point2(rectBottom.x, rectBottom.y)) as Point2;
+      this.vecBlock.push(blockBottom);
+    } else if (bHResidue) {
+      const rectRight = new Rect(iCol * iBlockW, 0, matSrc.cols - iCol * iBlockW, matSrc.rows);
+      const maxMin = cv.minMaxLoc(matSrc.getRegion(rectRight));
+      let blockRight: Block = { dMax: 0, rect: new Rect(), ptMaxLoc: new Point2(0, 0) };
+      blockRight.dMax = maxMin.maxVal;
+      blockRight.rect = rectRight;
+      blockRight.ptMaxLoc = maxMin.maxLoc;
+      blockRight.ptMaxLoc = blockRight.ptMaxLoc.add(new Point2(rectRight.x, rectRight.y)) as Point2;
+      this.vecBlock.push(blockRight);
+    } else {
+      const rectBottom = new Rect(0, iRow * iBlockH, matSrc.cols, matSrc.rows - iRow * iBlockH);
+      const maxMin2 = cv.minMaxLoc(matSrc.getRegion(rectBottom));
+      let blockBottom: Block = { dMax: 0, rect: new Rect(), ptMaxLoc: new Point2(0, 0) };
+      blockBottom.dMax = maxMin2.maxVal;
+      blockBottom.rect = rectBottom;
+      blockBottom.ptMaxLoc = maxMin2.maxLoc;
+      blockBottom.ptMaxLoc = blockBottom.ptMaxLoc.add(new Point2(rectBottom.x, rectBottom.y)) as Point2;
+      this.vecBlock.push(blockBottom);
+    }
+  }
+  UpdateMax(rectIgnore: Rect) {
+    if (this.vecBlock.length == 0) {
+      return;
+    }
+
+    const iSize = this.vecBlock.length;
+
+    for (let i = 0; i < iSize; i++) {
+      if (
+        !(
+          this.vecBlock[i].rect.x < rectIgnore.x + rectIgnore.width &&
+          this.vecBlock[i].rect.x + this.vecBlock[i].rect.width > rectIgnore.x &&
+          this.vecBlock[i].rect.y < rectIgnore.y + rectIgnore.height &&
+          this.vecBlock[i].rect.y + this.vecBlock[i].rect.height > rectIgnore.y
+        )
+      ) {
+        continue;
+      }
+
+      const minMax = cv.minMaxLoc(this.matSrc.getRegion(this.vecBlock[i].rect));
+      this.vecBlock[i].dMax = minMax.maxVal;
+      this.vecBlock[i].ptMaxLoc = minMax.maxLoc;
+      this.vecBlock[i].ptMaxLoc = this.vecBlock[i].ptMaxLoc.add(new Point2(this.vecBlock[i].rect.x, this.vecBlock[i].rect.y)) as Point2;
+    }
+  }
+  GetMaxValueLoc() {
+    const iSize = this.vecBlock.length;
+    let dMax, ptMaxLoc;
+
+    if (iSize == 0) {
+      const maxMin = cv.minMaxLoc(this.matSrc);
+      dMax = maxMin.maxVal;
+      ptMaxLoc = maxMin.maxLoc;
+
+      return { dMaxVal: dMax, ptMaxLoc: ptMaxLoc };
+    }
+    let iIndex = 0;
+    dMax = this.vecBlock[0].dMax;
+    for (let i = 1; i < iSize; i++) {
+      if (this.vecBlock[i].dMax >= dMax) {
+        iIndex = i;
+        dMax = this.vecBlock[i].dMax;
+      }
+    }
+    ptMaxLoc = this.vecBlock[iIndex].ptMaxLoc;
+
+    return { dMaxVal: dMax, ptMaxLoc: ptMaxLoc };
   }
 }
