@@ -3,11 +3,13 @@
 // Copyright (c) 2022, DennisLiu1993
 // All rights reserved.
 
-import cv from 'opencv4nodejs-prebuilt-install';
+let cv: any;
+
+try {
+  cv = require('opencv4nodejs-prebuilt-install');
+} catch {}
 import { MatchParameter, SingleTargetMatch, Vector } from '../types';
 import { Mat, Size, BORDER_CONSTANT, CV_32F, CV_64F, FILLED, INTER_LINEAR, Point2, Rect, RotatedRect, Vec3 } from 'opencv4nodejs-prebuilt-install';
-import { ImageProcessor } from '../readers/imageProcessor.class';
-import { imageResource } from '@nut-tree/nut-js';
 
 export class InvariantRotatingHandler {
   private static MATCH_CANDIDATE_NUM = 5;
@@ -111,7 +113,7 @@ export class InvariantRotatingHandler {
           srcMat: Mat;
           minMaxLoc: {
             dMaxVal: number;
-            ptMaxLoc: cv.Point2;
+            ptMaxLoc: Point2;
           };
         } = { srcMat: matResult, minMaxLoc: minMaxLoc };
 
