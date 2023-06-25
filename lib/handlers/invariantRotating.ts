@@ -45,6 +45,18 @@ export class InvariantRotatingHandler {
   }
 
   static async Match(matSrc: Mat, matDst: Mat, iMinDstLength: number, dScore: number = 0.8, rotationRange: number = 180, dMaxOverlap: number = 0, debug: boolean = false) {
+    if ((matDst.cols < matSrc.cols && matDst.rows > matSrc.rows) || (matDst.cols > matSrc.cols && matDst.rows < matSrc.rows)) {
+      throw new Error(
+        `(matDst.cols < matSrc.cols && matDst.rows > matSrc.rows) || (matDst.cols > matSrc.cols && matDst.rows < matSrc.rows) is ${
+          (matDst.cols < matSrc.cols && matDst.rows > matSrc.rows) || (matDst.cols > matSrc.cols && matDst.rows < matSrc.rows)
+        }`,
+      );
+    }
+
+    if (matDst.cols * matDst.rows > matSrc.cols * matDst.rows) {
+      throw new Error(`matDst.cols * matDst.rows > matSrc.cols * matDst.rows is ${matDst.cols * matDst.rows > matSrc.cols * matDst.rows}`);
+    }
+
     let m_iMaxPos = 70;
     let m_dToleranceAngle = rotationRange;
     let m_dMaxOverlap = dMaxOverlap;
@@ -58,6 +70,10 @@ export class InvariantRotatingHandler {
     let iTopLayer = InvariantRotatingHandler.GetTopLayer(matDst, Math.sqrt(iMinDstLength));
     const vecMatSrcPyr = await matSrc.buildPyramidAsync(iTopLayer);
     const pTemplData = await InvariantRotatingHandler.LearnPattern(matDst, iMinDstLength);
+
+    if (!pTemplData.bIsPatternLearned) {
+      throw new Error(`bIsPatternLearned is ${pTemplData.bIsPatternLearned}`);
+    }
 
     const dAngleStep = Math.atan(2.0 / Math.max(pTemplData.vecPyramid[iTopLayer].cols, pTemplData.vecPyramid[iTopLayer].rows)) * InvariantRotatingHandler.R2D;
 
