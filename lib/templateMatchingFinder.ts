@@ -7,7 +7,7 @@ import { OverWritingMatcherHandler } from './handlers/overWriting';
 import { ValidationHandler } from './handlers/validation';
 import { NonMaximumSuppressionHandler } from './handlers/nonMaximumSuppression';
 import { InvariantRotatingHandler } from './handlers/invariantRotating';
-import { imshow, Point2, Rect, waitKey } from 'opencv4nodejs-prebuilt-install';
+import { Point2 } from 'opencv4nodejs-prebuilt-install';
 
 export default class TemplateMatchingFinder implements ImageFinderInterface {
   private _config: CustomConfigType;
@@ -19,7 +19,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
         scaleSteps: [1, 0.9, 0.8, 0.7, 0.6, 0.5],
         methodType: MethodEnum.TM_CCOEFF_NORMED,
         debug: false,
-        isSearchMultipleScales: true,
+        searchMultipleScales: true,
         isRotation: false,
         rotationOption: { range: 180, overLap: 0.1, minDstLength: 32 },
       },
@@ -92,7 +92,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
         : matchRequest.confidence === 0.99 || typeof matchRequest.confidence === 'undefined'
         ? (this._config.confidence as number)
         : matchRequest.confidence;
-    const isSearchMultipleScales =
+    const searchMultipleScales =
       customMatchRequest.providerData && 'scaleSteps' in customMatchRequest.providerData && customMatchRequest.providerData.scaleSteps?.length ? true : !!this._config.providerData?.scaleSteps?.length;
     const scaleSteps = customMatchRequest.providerData?.scaleSteps || (this._config.providerData?.scaleSteps as Array<number>);
     const methodType = customMatchRequest.providerData?.methodType || (this._config.providerData?.methodType as MethodNameType);
@@ -114,7 +114,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
         }, got empty image.`,
       );
     }
-    if (isSearchMultipleScales) {
+    if (searchMultipleScales) {
       ValidationHandler.throwOnTooLargeNeedle(haystack.data, needle.data, scaleSteps[scaleSteps.length - 1]);
     }
 
@@ -125,7 +125,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
       scaleSteps: scaleSteps,
       methodType: methodType,
       debug: debug,
-      isSearchMultipleScales: isSearchMultipleScales,
+      searchMultipleScales: searchMultipleScales,
       roi: customMatchRequest.providerData?.roi,
       isRotation: isRotation,
       rotationOverLap: rotationOverLap,
@@ -135,10 +135,10 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
   }
 
   public async findMatch<OptionalSearchParameters>(matchRequest: MatchRequest<Image, OptionalSearchParameters> | CustomMatchRequest): Promise<MatchResult<Region>> {
-    let { haystack, rotationOverLap, rotationRange, isRotation, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, isSearchMultipleScales, roi } = await this.initData(matchRequest);
+    let { haystack, rotationOverLap, rotationRange, isRotation, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest);
     let matchResults: Array<MatchResult<Region>> = [];
 
-    if (!isSearchMultipleScales) {
+    if (!searchMultipleScales) {
       if (isRotation) {
         const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
         matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map(
@@ -166,9 +166,9 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
 
   public async findMatches<OptionalSearchParameters>(matchRequest: MatchRequest<Image, OptionalSearchParameters> | CustomMatchRequest): Promise<MatchResult<Region>[]> {
     let matchResults: Array<MatchResult<Region>> = [];
-    let { haystack, rotationOverLap, rotationRange, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, isSearchMultipleScales, roi } = await this.initData(matchRequest);
+    let { haystack, rotationOverLap, rotationRange, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest);
 
-    if (!isSearchMultipleScales) {
+    if (!searchMultipleScales) {
       if (rotationRange) {
         const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
         matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map(
