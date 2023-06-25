@@ -50,7 +50,11 @@ export class InvariantRotatingHandler {
     let m_dMaxOverlap = dMaxOverlap;
     let m_bStopLayer1 = false;
     let m_bToleranceRange = false;
+    let startTimeCheck = 0;
 
+    if (debug) {
+      startTimeCheck = performance.now();
+    }
     let iTopLayer = InvariantRotatingHandler.GetTopLayer(matDst, Math.sqrt(iMinDstLength));
     const vecMatSrcPyr = await matSrc.buildPyramidAsync(iTopLayer);
     const pTemplData = await InvariantRotatingHandler.LearnPattern(matDst, iMinDstLength);
@@ -372,6 +376,10 @@ export class InvariantRotatingHandler {
         matSrc.drawLine(sstm.ptCenter?.sub(new Point2(5, 0)) as Point2, sstm.ptCenter?.add(new Point2(5, 0)) as Point2, new Vec3(255, 0, 0), 2);
         matSrc.drawLine(sstm.ptCenter?.sub(new Point2(0, 5)) as Point2, sstm.ptCenter?.add(new Point2(0, 5)) as Point2, new Vec3(255, 0, 0), 2);
       }
+
+      const endTimeCheck = performance.now();
+      console.log(`Performing time was ${endTimeCheck - startTimeCheck}`);
+
       cv.imshow('debug', matSrc);
       cv.waitKey(0);
     }

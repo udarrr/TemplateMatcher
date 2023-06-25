@@ -21,7 +21,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
         debug: false,
         isSearchMultipleScales: true,
         isRotation: false,
-        rotationOption: { range: 180, overLap: 0.1, minDstLength: 256 },
+        rotationOption: { range: 180, overLap: 0.1, minDstLength: 32 },
       },
     };
   }
