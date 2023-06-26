@@ -21,7 +21,7 @@ export interface OptionsSearchParameterType {
   scaleSteps?: Array<number>;
   searchMultipleScales?: boolean;
   isRotation?: boolean;
-  rotationOption?: { range?: number; overLap?: number; minDstLength?: number };
+  rotationOption?: { range?: number; overLap?: number; minDstLength?: number; subPixEstimation?: boolean };
   debug?: boolean;
   roi?: Region;
 }

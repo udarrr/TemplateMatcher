@@ -21,7 +21,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
         debug: false,
         searchMultipleScales: true,
         isRotation: false,
-        rotationOption: { range: 180, overLap: 0.1, minDstLength: 32 },
+        rotationOption: { range: 180, overLap: 0.1, minDstLength: 32, subPixEstimation: false },
       },
     };
   }
@@ -101,6 +101,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
     const rotationOverLap = customMatchRequest.providerData?.rotationOption?.overLap || (this._config.providerData?.rotationOption?.overLap as number);
     const rotationRange = customMatchRequest.providerData?.rotationOption?.range || this._config.providerData?.rotationOption?.range;
     const rotationMinLength = customMatchRequest.providerData?.rotationOption?.minDstLength || this._config.providerData?.rotationOption?.minDstLength;
+    const subPixEstimation = customMatchRequest.providerData?.rotationOption?.subPixEstimation || this._config.providerData?.rotationOption?.subPixEstimation;
 
     const needle = await this.loadNeedle(matchRequest.needle);
     if (!needle || needle.data.empty) {
@@ -131,16 +132,18 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
       rotationOverLap: rotationOverLap,
       rotationRange: rotationRange,
       rotationMinLength: rotationMinLength,
+      subPixEstimation: subPixEstimation,
     };
   }
 
   public async findMatch<OptionalSearchParameters>(matchRequest: MatchRequest<Image, OptionalSearchParameters> | CustomMatchRequest): Promise<MatchResult<Region>> {
-    let { haystack, rotationOverLap, rotationRange, isRotation, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest);
+    let { haystack, rotationOverLap, subPixEstimation, rotationRange, isRotation, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } =
+      await this.initData(matchRequest);
     let matchResults: Array<MatchResult<Region>> = [];
 
     if (!searchMultipleScales) {
       if (isRotation) {
-        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
+        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap, subPixEstimation, debug);
         matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map(
           (i) => new MatchResult<Region>(i.match.dMatchScore, new Region(i.point.x, i.point.y, i.newSize.width, i.newSize.height)),
         );
@@ -153,7 +156,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
       let matchResults: Array<MatchResult<Region>> = [];
 
       if (isRotation) {
-        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
+        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap, subPixEstimation, debug);
         matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map(
           (i) => new MatchResult<Region>(i.match.dMatchScore, new Region(i.point.x, i.point.y, i.newSize.width, i.newSize.height)),
         );
@@ -166,11 +169,13 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
 
   public async findMatches<OptionalSearchParameters>(matchRequest: MatchRequest<Image, OptionalSearchParameters> | CustomMatchRequest): Promise<MatchResult<Region>[]> {
     let matchResults: Array<MatchResult<Region>> = [];
-    let { haystack, rotationOverLap, rotationRange, rotationMinLength, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(matchRequest);
+    let { haystack, rotationOverLap, rotationRange, rotationMinLength, subPixEstimation, needle, confidence, scaleSteps, methodType, debug, searchMultipleScales, roi } = await this.initData(
+      matchRequest,
+    );
 
     if (!searchMultipleScales) {
       if (rotationRange) {
-        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
+        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap, subPixEstimation, debug);
         matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map(
           (i) => new MatchResult<Region>(i.match.dMatchScore, new Region(i.point.x, i.point.y, i.newSize.width, i.newSize.height)),
         );
@@ -180,7 +185,7 @@ export default class TemplateMatchingFinder implements ImageFinderInterface {
       }
     } else {
       if (rotationRange) {
-        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap);
+        const rotatedResults = await InvariantRotatingHandler.Match(haystack.data, needle.data, rotationMinLength as number, confidence, rotationRange, rotationOverLap, subPixEstimation, debug);
         matchResults = this.getRotatedFullRectanglePointWithoutAngle(rotatedResults).map(
           (i) => new MatchResult<Region>(i.match.dMatchScore, new Region(i.point.x, i.point.y, i.newSize.width, i.newSize.height)),
         );

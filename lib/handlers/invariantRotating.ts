@@ -3,13 +3,11 @@
 // Copyright (c) 2022, DennisLiu1993
 // All rights reserved.
 
-let cv: any;
-
-try {
-  cv = require('opencv4nodejs-prebuilt-install');
-} catch {}
+import cv from 'opencv4nodejs-prebuilt-install';
 import { MatchParameter, SingleTargetMatch, Vector } from '../types';
 import { Mat, Size, BORDER_CONSTANT, CV_32F, CV_64F, FILLED, INTER_LINEAR, Point2, Rect, RotatedRect, Vec3 } from 'opencv4nodejs-prebuilt-install';
+import { ImageProcessor } from '../readers/imageProcessor.class';
+import { imageResource } from '@nut-tree/nut-js';
 
 export class InvariantRotatingHandler {
   private static MATCH_CANDIDATE_NUM = 5;
@@ -44,7 +42,16 @@ export class InvariantRotatingHandler {
     return await matSrc.warpAffineAsync(rMat, new Size(sizePadding.width, sizePadding.height));
   }
 
-  static async Match(matSrc: Mat, matDst: Mat, iMinDstLength: number, dScore: number = 0.8, rotationRange: number = 180, dMaxOverlap: number = 0, debug: boolean = false) {
+  static async Match(
+    matSrc: Mat,
+    matDst: Mat,
+    iMinDstLength: number,
+    dScore: number = 0.8,
+    rotationRange: number = 180,
+    dMaxOverlap: number = 0,
+    subPixEstimation: boolean = false,
+    debug: boolean = false,
+  ) {
     if ((matDst.cols < matSrc.cols && matDst.rows > matSrc.rows) || (matDst.cols > matSrc.cols && matDst.rows < matSrc.rows)) {
       throw new Error(
         `(matDst.cols < matSrc.cols && matDst.rows > matSrc.rows) || (matDst.cols > matSrc.cols && matDst.rows < matSrc.rows) is ${
@@ -63,6 +70,7 @@ export class InvariantRotatingHandler {
     let m_bStopLayer1 = false;
     let m_bToleranceRange = false;
     let startTimeCheck = 0;
+    let bSubPixelEstimation = subPixEstimation;
 
     if (debug) {
       startTimeCheck = performance.now();
@@ -284,6 +292,12 @@ export class InvariantRotatingHandler {
           if (vecNewMatchParameter[iMaxScoreIndex].dMatchScore < vecLayerScore[iLayer]) {
             break;
           }
+          if (bSubPixelEstimation && iLayer == 0 && !vecNewMatchParameter[iMaxScoreIndex].bPosOnBorder && iMaxScoreIndex != 0 && iMaxScoreIndex != 2) {
+            const newCoords = InvariantRotatingHandler.SubPixEstimation(vecNewMatchParameter, dAngleStep, iMaxScoreIndex);
+            vecNewMatchParameter[iMaxScoreIndex].pt = new Point2(newCoords.dNewX, newCoords.dNewY);
+            vecNewMatchParameter[iMaxScoreIndex].dMatchAngle = newCoords.dNewAngle;
+          }
+
           const dNewMatchAngle = vecNewMatchParameter[iMaxScoreIndex].dMatchAngle;
           const ptPaddingLT: Point2 = InvariantRotatingHandler.ptRotatePt2f(ptLT.mul(2) as Point2, ptSrcCenter, dNewMatchAngle * InvariantRotatingHandler.D2R).sub(new Point2(3, 3)) as Point2;
           let pt = new Point2(vecNewMatchParameter[iMaxScoreIndex].pt.x + ptPaddingLT.x, vecNewMatchParameter[iMaxScoreIndex].pt.y + ptPaddingLT.y);
@@ -400,6 +414,105 @@ export class InvariantRotatingHandler {
       cv.waitKey(0);
     }
     return m_vecSingleTargetData;
+  }
+
+  private static SubPixEstimation(vec: Array<MatchParameter>, dAngleStep: number, iMaxScoreIndex: number) {
+    let matA = new Mat(27, 10, CV_64F);
+    let matZ = new Mat(10, 1, CV_64F);
+    let matS = new Mat(27, 1, CV_64F);
+
+    const dX_maxScore = vec[iMaxScoreIndex].pt.x;
+    const dY_maxScore = vec[iMaxScoreIndex].pt.y;
+    const dTheata_maxScore = vec[iMaxScoreIndex].dMatchAngle;
+    let iRow = 0;
+
+    for (let theta = 0; theta <= 2; theta++) {
+      for (let y = -1; y <= 1; y++) {
+        for (let x = -1; x <= 1; x++) {
+          const dX = dX_maxScore + x;
+          const dY = dY_maxScore + y;
+
+          const dT = (dTheata_maxScore + (theta - 1) * dAngleStep) * InvariantRotatingHandler.D2R;
+          matA.set(iRow, 0, dX * dX);
+          matA.set(iRow, 1, dY * dY);
+          matA.set(iRow, 2, dT * dT);
+          matA.set(iRow, 3, dX * dY);
+          matA.set(iRow, 4, dX * dT);
+          matA.set(iRow, 5, dY * dT);
+          matA.set(iRow, 6, dX);
+          matA.set(iRow, 7, dY);
+          matA.set(iRow, 8, dT);
+          matA.set(iRow, 9, 1.0);
+          matS.set(iRow, 0, (vec[iMaxScoreIndex + (theta - 1)] as any).vecResult[x + 1][y + 1]);
+          iRow++;
+        }
+      }
+    }
+    const matATransposed = InvariantRotatingHandler.Transpose(matA);
+    const matAMultiplicated = matATransposed.matMul(matA);
+    const matAInverted = InvariantRotatingHandler.Invert(matAMultiplicated);
+    const matAInvertedMultiplicated = matAInverted.matMul(InvariantRotatingHandler.Transpose(matA));
+    matZ = matAInvertedMultiplicated.matMul(matS);
+    const matZ_t = InvariantRotatingHandler.Transpose(matZ);
+
+    let matK1 = new Mat(3, 3, cv.CV_64F);
+
+    matK1.set(0, 0, 2 * matZ_t.at(0, 0));
+    matK1.set(0, 1, matZ_t.at(0, 3));
+    matK1.set(0, 2, matZ_t.at(0, 4));
+    matK1.set(1, 0, matZ_t.at(0, 3));
+    matK1.set(1, 1, 2 * matZ_t.at(0, 1));
+    matK1.set(1, 2, matZ_t.at(0, 5));
+    matK1.set(2, 0, matZ_t.at(0, 4));
+    matK1.set(2, 1, matZ_t.at(0, 5));
+    matK1.set(2, 2, 2 * matZ_t.at(0, 2));
+
+    let matK2 = new Mat(3, 1, cv.CV_64F);
+
+    matK2.set(0, 0, -matZ_t.at(0, 6));
+    matK2.set(1, 0, -matZ_t.at(0, 7));
+    matK2.set(2, 0, -matZ_t.at(0, 8));
+
+    const matDelta = InvariantRotatingHandler.Invert(matK1).matMul(matK2);
+
+    const dNewX = matDelta.at(0, 0);
+    const dNewY = matDelta.at(1, 0);
+    const dNewAngle = matDelta.at(2, 0) * InvariantRotatingHandler.R2D;
+
+    return { dNewX: dNewX / 10, dNewY: dNewY / 10, dNewAngle: dNewAngle / 10 };
+  }
+
+  static Transpose(mat: Mat) {
+    const data = mat.getDataAsArray();
+    const transposed: number[][] = Array.from(new Array(mat.cols), () => []);
+
+    for (let k = 0; k < mat.cols; k++) {
+      transposed[k] = [...Array(mat.rows).keys()].fill(0);
+    }
+
+    for (let j = 0; j < mat.cols; j++) {
+      for (let i = 0; i < mat.rows; i++) {
+        transposed[j][i] = data[i][j];
+      }
+    }
+
+    return new Mat(transposed, CV_64F);
+  }
+
+  static Invert(image: Mat) {
+    const data = image.getData();
+
+    for (let i = 0; i < data.length; i += 8) {
+      data[i] = 255 - data[i];
+      data[i + 1] = Math.abs(255 - data[i + 1]);
+      data[i + 2] = Math.abs(255 - data[i + 2]);
+      data[i + 3] = Math.abs(255 - data[i + 3]);
+      data[i + 4] = Math.abs(255 - data[i + 4]);
+      data[i + 5] = Math.abs(255 - data[i + 5]);
+      data[i + 6] = Math.abs(255 - data[i + 6]);
+      data[i + 7] = Math.abs(255 - data[i + 7]);
+    }
+    return new Mat(data, image.rows, image.cols, CV_64F);
   }
 
   private static RotatedRect(ptLT: Point2, ptRT: Point2, ptRB: Point2) {
@@ -711,7 +824,7 @@ export class InvariantRotatingHandler {
     } else {
       buffer = new Float64Array(uint.buffer);
     }
-    const arr: any = Array.from(new Array(mat.rows), () => []);
+    const arr: number[][] = Array.from(new Array(mat.rows), () => []);
 
     for (let i = 0; i < buffer.length; i++) {
       const row = Math.floor(i / mat.cols);

@@ -44,7 +44,7 @@ const matchesWithScreen = await finder.findMatches({needle: 'pathToTemplate'});
                        scaleSteps?: Array<number>; 
                        searchMultipleScales: boolean,
                        isRotation: boolean,
-                       rotationOption?: { range?: number; overLap?: number; minDstLength?: number };
+                       rotationOption?: { range?: number; overLap?: number; minDstLength?: number, subPixEstimation?: boolean };
                        roi?: Region; 
                        debug?: boolean
                     },
@@ -78,7 +78,7 @@ import "@udarrr/template-matcher"; //once wherever
       scaleSteps?: Array<number>;
       searchMultipleScales: boolean,
       isRotation: boolean,
-      rotationOption?: { range?: number; overLap?: number; minDstLength?: number };
+      rotationOption?: { range?: number; overLap?: number; minDstLength?: number, subPixEstimation?: boolean };
       debug?: boolean;
       roi?: Region;
   }
@@ -93,6 +93,11 @@ scaleSteps: [1, 0.9, 0.8, 0.7, 0.6, 0.5]
 debug: false
 searchMultipleScales: true,
 isRotation: false,
-rotationOption: {range: 180, overLap: 0.1, minDstLength: 256}
-confidence: 0.8
+rotationOption: {
+                 range: 180, //-180 +180
+                 overLap: 0.1, //inverted scale 0.1 = scaleSteps[0.9]
+                 minDstLength: 32, //quality
+                 subPixEstimation: false 
+                }
+confidence: 0.8 //0.98 for TM_SQDIFF
 ```
