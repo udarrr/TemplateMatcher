@@ -73,14 +73,20 @@ import "@udarrr/template-matcher"; //once wherever
 
 ```typescript
 {
-  providerData?: {
-      methodType?: MethodNameType;
-      scaleSteps?: Array<number>;
-      searchMultipleScales: boolean,
-      isRotation: boolean,
-      rotationOption?: { range?: number; overLap?: number; minDstLength?: number, subPixEstimation?: boolean };
-      debug?: boolean;
-      roi?: Region;
+  searchInput: RegionResultFindInput | Promise<RegionResultFindInput>
+  params?: {
+      searchRegion?: Region | Promise<Region> | undefined;
+      confidence?: number | undefined;
+      abort?: AbortSignal | undefined;
+      providerData?: {
+          methodType?: MethodNameType;
+          scaleSteps?: Array<number>;
+          searchMultipleScales: boolean,
+          isRotation: boolean,
+          rotationOption?: { range?: number; overLap?: number; minDstLength?: number, subPixEstimation?: boolean };
+          debug?: boolean;
+          roi?: Region;
+      }
   }
 };
 ```
@@ -96,8 +102,8 @@ isRotation: false,
 rotationOption: {
                  range: 180, //-180 +180
                  overLap: 0.1, //inverted scale 0.1 = scaleSteps[0.9]
-                 minDstLength: 32, //quality
-                 subPixEstimation: false 
+                 minDstLength: 32, //quality matching up to 4096
+                 subPixEstimation: false //for low quality pics
                 }
 confidence: 0.8 //0.98 for TM_SQDIFF
 ```
