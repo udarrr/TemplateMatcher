@@ -1,13 +1,8 @@
-// Source C++ library //https://github.com/DennisLiu1993/Fastest_Image_Pattern_Matching under
-// BSD 2-Clause License
-// Copyright (c) 2022, DennisLiu1993
-// All rights reserved.
+// Source C++ library //https://github.com/DennisLiu1993/Fastest_Image_Pattern_Matching under BSD 2-Clause License Copyright (c) 2022, DennisLiu1993
 
 import cv from 'opencv4nodejs-prebuilt-install';
 import { MatchParameter, SingleTargetMatch, Vector } from '../types';
 import { Mat, Size, BORDER_CONSTANT, CV_32F, CV_64F, FILLED, INTER_LINEAR, Point2, Rect, RotatedRect, Vec3 } from 'opencv4nodejs-prebuilt-install';
-import { ImageProcessor } from '../readers/imageProcessor.class';
-import { imageResource } from '@nut-tree/nut-js';
 
 export class InvariantRotatingHandler {
   private static MATCH_CANDIDATE_NUM = 5;
@@ -450,7 +445,7 @@ export class InvariantRotatingHandler {
     }
     const matATransposed = InvariantRotatingHandler.Transpose(matA);
     const matAMultiplicated = matATransposed.matMul(matA);
-    const matAInverted = InvariantRotatingHandler.Invert(matAMultiplicated);
+    const matAInverted = cv.invert(matAMultiplicated);
     const matAInvertedMultiplicated = matAInverted.matMul(InvariantRotatingHandler.Transpose(matA));
     matZ = matAInvertedMultiplicated.matMul(matS);
     const matZ_t = InvariantRotatingHandler.Transpose(matZ);
@@ -473,13 +468,13 @@ export class InvariantRotatingHandler {
     matK2.set(1, 0, -matZ_t.at(0, 7));
     matK2.set(2, 0, -matZ_t.at(0, 8));
 
-    const matDelta = InvariantRotatingHandler.Invert(matK1).matMul(matK2);
+    const matDelta = cv.invert(matK1).matMul(matK2);
 
     const dNewX = matDelta.at(0, 0);
     const dNewY = matDelta.at(1, 0);
     const dNewAngle = matDelta.at(2, 0) * InvariantRotatingHandler.R2D;
 
-    return { dNewX: dNewX / 10, dNewY: dNewY / 10, dNewAngle: dNewAngle / 10 };
+    return { dNewX: dNewX, dNewY: dNewY, dNewAngle: dNewAngle };
   }
 
   static Transpose(mat: Mat) {
