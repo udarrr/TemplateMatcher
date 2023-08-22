@@ -1,6 +1,6 @@
 {
   "name": "@udarrr/template-matcher",
-  "version": "4.5.2",
+  "version": "4.5.3",
   "main": "dist/index",
   "typings": "dist/index",
   "description": "Locate images on your screen using template matching in nut.js or standalone",
@@ -23,9 +23,6 @@
     "linux",
     "darwin",
     "win32"
-  ],
-  "cpu": [
-    "x64"
   ],
   "keywords": [
     "native",
