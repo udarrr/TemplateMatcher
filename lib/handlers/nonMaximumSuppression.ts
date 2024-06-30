@@ -1,4 +1,4 @@
-import { MatchResult, Region } from '@nut-tree/nut-js';
+import { MatchResult, Region } from '@nut-tree-fork/nut-js';
 
 const { min, max } = Math;
 

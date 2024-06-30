@@ -4,7 +4,7 @@ try {
   cv = require('opencv4nodejs-prebuilt-install');
 } catch {}
 
-import { MatchResult, Region } from '@nut-tree/nut-js';
+import { MatchResult, Region } from '@nut-tree-fork/nut-js';
 import { MatchedResults, MethodEnum, MethodNameType } from '../types';
 import { Mat, Point2, Vec3 } from 'opencv4nodejs-prebuilt-install';
 

@@ -54,7 +54,7 @@
   },
   "dependencies": {
     "opencv4nodejs-prebuilt-install": "^4.1.202",
-    "@nut-tree/nut-js": "^3.1.2"
+    "@nut-tree-fork/nut-js": "^4.2.1"
   },
   "devDependencies": {
     "@types/jest": "27.4.1",
