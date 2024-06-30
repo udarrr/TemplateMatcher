@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { MatchRequest, Region } from '@nut-tree/nut-js';
+import { MatchRequest, Region } from '@nut-tree-fork/nut-js';
 import ImageReader from '../lib/readers/imageReader.class';
 import TemplateMatchingFinder from '../lib/templateMatchingFinder';
 
