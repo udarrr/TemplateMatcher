@@ -1,4 +1,4 @@
-import { Image, ImageFinderInterface, imageResource, MatchRequest, MatchResult, Region, screen } from '@nut-tree/nut-js';
+import { Image, ImageFinderInterface, imageResource, MatchRequest, MatchResult, Region, screen } from '@nut-tree-fork/nut-js';
 import { ScaleImageHandler } from './handlers/scaleImage';
 import { ImageProcessor } from './readers/imageProcessor.class';
 import { Mat } from 'opencv4nodejs-prebuilt-install/lib/typings/Mat';

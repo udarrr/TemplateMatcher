@@ -4,7 +4,7 @@ try {
   cv = require('opencv4nodejs-prebuilt-install');
 } catch {}
 
-import { ColorMode, Image } from '@nut-tree/nut-js';
+import { ColorMode, Image } from '@nut-tree-fork/nut-js';
 import { Mat } from 'opencv4nodejs-prebuilt-install/lib/typings/Mat';
 import { Rect } from 'opencv4nodejs-prebuilt-install/lib/typings/Rect';
 

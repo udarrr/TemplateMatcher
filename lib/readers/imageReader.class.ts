@@ -4,7 +4,7 @@ try {
   cv = require('opencv4nodejs-prebuilt-install');
 } catch {}
 
-import { Image, ImageReader } from '@nut-tree/nut-js';
+import { Image, ImageReader } from '@nut-tree-fork/nut-js';
 
 export default class implements ImageReader {
   public async load(path: string): Promise<Image> {
