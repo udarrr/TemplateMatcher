@@ -12,8 +12,8 @@ jobs:
     strategy:
       matrix:
         os:
-          - name: Ubuntu
-            version: latest
+          - name: windows
+            version: 2019
         node: ['16']
         arch: [x64]
     steps:
